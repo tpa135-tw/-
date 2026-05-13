@@ -1,6 +1,8 @@
 name: Daily Taiwan Stock Scanner
 
 on:
+  workflow_dispatch:
+
   schedule:
     - cron: '30 23 * * *'
 
