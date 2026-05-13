@@ -3,7 +3,7 @@ name: Daily Taiwan Stock Scanner
 on:
   workflow_dispatch:
   schedule:
-    - cron: '30 23 * * *' # 台灣時間 07:30 執行
+    - cron: '30 23 * * *'
 
 jobs:
   run-stock:
@@ -18,17 +18,15 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.11'
 
       - name: Install Packages
         run: |
-          - name: Install Packages
-        run: |
           python -m pip install --upgrade pip setuptools wheel
-          pip install pandas yfinance twstock feedparser requests lxml
-          # 改用最穩定的 git+https 語法，這會讓 pip 自動抓取預設分支 (可能是 master 或 main)
-          # 如果之前 git clone 報錯 128，是因為 GitHub 需要 token，我們改用以下寫法：
-          pip install git+https://github.com/twopirllc/pandas-ta.git
+          # 鎖定 pandas 版本以確保與 pandas-ta 相容
+          pip install pandas==2.2.2 yfinance twstock feedparser requests lxml
+          # 終極安裝方式：繞過 git clone 與特定 zip 路徑限制
+          pip install https://github.com/twopirllc/pandas-ta/tarball/master
 
       - name: Run Scanner
         env:
