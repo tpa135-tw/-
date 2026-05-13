@@ -1,0 +1,29 @@
+name: Daily Taiwan Stock Scanner
+
+on:
+  schedule:
+    - cron: '30 23 * * *'
+
+jobs:
+  run-stock:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Packages
+      run: |
+        pip install pandas
+        pip install yfinance
+        pip install twstock
+        pip install pandas-ta
+        pip install feedparser
+
+    - name: Run Scanner
+      run: python stock_auto.py
