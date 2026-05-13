@@ -3,7 +3,7 @@ name: Daily Taiwan Stock Scanner
 on:
   workflow_dispatch:
   schedule:
-    - cron: '30 23 * * *' # 台灣時間 07:30 執行
+    - cron: '30 23 * * *'
 
 jobs:
   run-stock:
@@ -23,10 +23,12 @@ jobs:
       - name: Install Packages
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          # 鎖定 pandas 版本，因為 pandas-ta 與 pandas 3.0+ 不相容
+          # 鎖定 pandas 2.x 版本，因為 pandas-ta 與 pandas 3.0 完全不相容
           pip install pandas==2.2.2 yfinance twstock feedparser requests lxml
-          # 使用最原始的 Git 連結安裝，避開所有 zip 損壞與權限問題
-          pip install git+https://github.com/twopirllc/pandas-ta.git
+          
+          # 終極方案：不連 GitHub，直接從 PyPI 安裝開發者最後上傳的預發佈版
+          # 加上 --pre 會自動尋找最新的開發版本（如 0.4.x），這是最穩定的安裝法
+          pip install pandas-ta --pre
 
       - name: Run Scanner
         env:
