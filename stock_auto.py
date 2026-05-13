@@ -49,15 +49,15 @@ content = top10.to_string(index=False)
 
 msg = MIMEText(content)
 msg['Subject'] = '今日台股自動選股'
-msg['From'] = '0828joanne@gmail.com'
-msg['To'] = '0828joanne@gmail.com'
+msg['From'] = 'a26805848@yahoo.com.tw'
+msg['To'] = 'a26805848@yahoo.com.tw'
 
 server = smtplib.SMTP('smtp.mail.yahoo.com', 587)
 server.starttls()
 
 server.login(
-    '0828joanne@gmail.com,
-    'joanne@0828'
+    'a26805848@yahoo.com.tw,
+    'maInt8aiN-@852'
 )
 
 server.send_message(msg)
