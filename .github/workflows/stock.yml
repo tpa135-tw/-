@@ -23,10 +23,14 @@ jobs:
       - name: Install Packages
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          # 核心套件：鎖定 pandas 以避免相容性問題
+          # 先裝核心套件並鎖定版本
           pip install pandas==2.2.2 yfinance twstock feedparser requests lxml
-          # 終極解決方案：直接指定版本號，解決搜尋不到套件的問題
-          pip install pandas-ta==0.3.14b0
+          
+          # 解決 pandas-ta 安裝問題：直接 Clone 並從本地安裝
+          git clone --depth 1 https://github.com/twopirllc/pandas-ta.git
+          cd pandas-ta
+          pip install .
+          cd ..
 
       - name: Run Scanner
         env:
