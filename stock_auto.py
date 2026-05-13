@@ -52,13 +52,18 @@ msg['Subject'] = '今日台股自動選股'
 msg['From'] = 'a26805848@yahoo.com.tw'
 msg['To'] = 'a26805848@yahoo.com.tw'
 
+import os
+
+email = os.environ['YAHOO_EMAIL']
+password = os.environ['YAHOO_PASSWORD']
+
+msg['From'] = email
+msg['To'] = email
+
 server = smtplib.SMTP('smtp.mail.yahoo.com', 587)
 server.starttls()
 
-server.login(
-    'a26805848@yahoo.com.tw,
-    'maInt8aiN-@852'
-)
+server.login(email, password)
 
 server.send_message(msg)
 server.quit()
