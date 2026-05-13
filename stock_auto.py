@@ -52,7 +52,7 @@ msg['Subject'] = '今日台股自動選股'
 msg['From'] = '0828joanne@gmail.com'
 msg['To'] = '0828joanne@gmail.com'
 
-server = smtplib.SMTP('smtp.gmail.com', 587)
+server = smtplib.SMTP('smtp.mail.yahoo.com', 587)
 server.starttls()
 
 server.login(
