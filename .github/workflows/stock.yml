@@ -1,45 +1,96 @@
 name: Daily Taiwan Stock Scanner
 
 on:
+
   workflow_dispatch:
+
   schedule:
-    - cron: '30 23 * * *'
+    # 台灣時間早上 07:30
+    - cron: '30 23 * * 0-4'
 
 jobs:
+
   run-stock:
+
     runs-on: ubuntu-latest
+
+    timeout-minutes: 15
+
     permissions:
       contents: write
 
     steps:
+
+      # =========================
+      # Checkout
+      # =========================
       - name: Checkout
         uses: actions/checkout@v4
 
+      # =========================
+      # Setup Python
+      # =========================
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
 
+      # =========================
+      # Install Packages
+      # =========================
       - name: Install Packages
         run: |
+
           python -m pip install --upgrade pip setuptools wheel
-          # 鎖定 pandas 2.x 版本，因為 pandas-ta 與 pandas 3.0 完全不相容
-          pip install pandas==2.2.2 yfinance twstock feedparser requests lxml
-          
-          # 終極方案：不連 GitHub，直接從 PyPI 安裝開發者最後上傳的預發佈版
-          # 加上 --pre 會自動尋找最新的開發版本（如 0.4.x），這是最穩定的安裝法
+
+          pip install pandas==2.2.2
+
+          pip install \
+            numpy \
+            yfinance \
+            twstock \
+            feedparser \
+            requests \
+            lxml
+
           pip install pandas-ta --pre
 
+      # =========================
+      # Run Scanner
+      # =========================
       - name: Run Scanner
         env:
           YAHOO_EMAIL: ${{ secrets.YAHOO_EMAIL }}
           YAHOO_PASSWORD: ${{ secrets.YAHOO_PASSWORD }}
-        run: python stock_auto.py
 
+        run: |
+
+          python main.py
+
+      # =========================
+      # Upload CSV
+      # =========================
+      - name: Upload CSV
+        uses: actions/upload-artifact@v4
+        with:
+          name: stock-report
+          path: stock_report.csv
+
+      # =========================
+      # Commit Results
+      # =========================
       - name: Commit and Push Results
         run: |
+
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
+
           git config --local user.name "github-actions[bot]"
+
           git add .
-          git commit -m "Auto-update stock results" || echo "No changes to commit"
+
+          git diff --cached --quiet && echo "No changes"
+
+          git commit -m "Auto-update stock results" || exit 0
+
           git push
