@@ -10,31 +10,47 @@ from email.mime.text import MIMEText
 from email.header import Header
 
 # =========================
-# 發送 Email
+# 發送 Yahoo Email
 # =========================
-def send_yahoo_email(content):
+def send_yahoo_email(df):
 
-    email_user = os.environ.get("YAHOO_EMAIL")
-    email_password = os.environ.get("YAHOO_PASSWORD")
+    email_user = os.environ.get('YAHOO_EMAIL')
+    email_password = os.environ.get('YAHOO_PASSWORD')
 
+    # 檢查環境變數
     if not email_user or not email_password:
-        print("找不到 Yahoo Email 環境變數")
+
+        print("未偵測到 Email 環境變數")
+
         return
-
-    msg = MIMEText(content, "plain", "utf-8")
-
-    msg["Subject"] = Header(
-        "台股 AI 自動選股報告",
-        "utf-8"
-    )
-
-    msg["From"] = email_user
-    msg["To"] = email_user
 
     try:
 
+        # 將 DataFrame 轉文字
+        content = (
+            "今日 AI 台股觀察名單\n\n"
+            + df.to_string(index=False)
+        )
+
+        # 建立 Email
+        msg = MIMEText(
+            content,
+            'plain',
+            'utf-8'
+        )
+
+        msg['Subject'] = Header(
+            '台股 AI 自動選股報告',
+            'utf-8'
+        )
+
+        msg['From'] = email_user
+
+        msg['To'] = email_user
+
+        # Yahoo SMTP 固定設定
         server = smtplib.SMTP(
-            "smtp.mail.yahoo.com",
+            'smtp.mail.yahoo.com',
             587
         )
 
@@ -49,11 +65,11 @@ def send_yahoo_email(content):
 
         server.quit()
 
-        print("Email 發送成功")
+        print('Email 已成功送出至 Yahoo 信箱')
 
     except Exception as e:
 
-        print(f"Email 發送失敗: {e}")
+        print(f'Email 發送錯誤: {e}')
 
 
 # =========================
