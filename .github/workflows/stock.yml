@@ -22,7 +22,7 @@ jobs:
     steps:
 
       # =========================
-      # Checkout
+      # Checkout Repository
       # =========================
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,7 +34,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: 'pip'
 
       # =========================
       # Install Packages
@@ -44,8 +43,10 @@ jobs:
 
           python -m pip install --upgrade pip setuptools wheel
 
+          # pandas 版本固定
           pip install pandas==2.2.2
 
+          # 基本套件
           pip install \
             numpy \
             yfinance \
@@ -54,10 +55,11 @@ jobs:
             requests \
             lxml
 
-          pip install pandas-ta --pre
+          # pandas-ta 預發版
+          pip install --pre pandas-ta
 
       # =========================
-      # Run Scanner
+      # Run Python Script
       # =========================
       - name: Run Scanner
         env:
@@ -69,7 +71,7 @@ jobs:
           python main.py
 
       # =========================
-      # Upload CSV
+      # Upload CSV Report
       # =========================
       - name: Upload CSV
         uses: actions/upload-artifact@v4
@@ -78,7 +80,7 @@ jobs:
           path: stock_report.csv
 
       # =========================
-      # Commit Results
+      # Commit CSV
       # =========================
       - name: Commit and Push Results
         run: |
@@ -87,10 +89,10 @@ jobs:
 
           git config --local user.name "github-actions[bot]"
 
-          git add .
+          git add stock_report.csv
 
           git diff --cached --quiet && echo "No changes"
 
-          git commit -m "Auto-update stock results" || exit 0
+          git commit -m "Auto update stock report" || exit 0
 
           git push
