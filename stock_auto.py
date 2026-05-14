@@ -2,9 +2,9 @@ import os
 import smtplib
 import traceback
 import pandas as pd
-import numpy as np
 import pandas_ta as ta
 import yfinance as yf
+import feedparser
 
 from email.mime.text import MIMEText
 from email.header import Header
@@ -23,7 +23,7 @@ def send_email(content):
         return
 
     msg = MIMEText(content, "plain", "utf-8")
-    msg["Subject"] = Header("台股量化3.0回測報告", "utf-8")
+    msg["Subject"] = Header("📱 台股量化3.2（手機簡版）", "utf-8")
     msg["From"] = user
     msg["To"] = user
 
@@ -47,102 +47,43 @@ def get_stocks():
 
 
 # =========================
-# 產生策略信號
+# 分數模型（簡化）
 # =========================
-def generate_signal(df):
+def score_stock(df):
 
-    df["RSI"] = ta.rsi(df["Close"], 14)
+    score = 0
 
-    macd = ta.macd(df["Close"])
-    df["MACD"] = macd["MACD_12_26_9"]
-    df["MACDs"] = macd["MACDs_12_26_9"]
+    last = df.iloc[-1]
 
-    df["SMA20"] = ta.sma(df["Close"], 20)
-    df["SMA60"] = ta.sma(df["Close"], 60)
+    if last["Close"] > last["SMA20"]:
+        score += 2
 
-    df["VOL20"] = ta.sma(df["Volume"], 20)
+    if last["SMA20"] > last["SMA60"]:
+        score += 2
 
-    signal = []
+    if last["RSI"] > 50:
+        score += 1
 
-    for i in range(len(df)):
+    if last["MACD"] > last["MACDs"]:
+        score += 2
 
-        if i < 60:
-            signal.append(0)
-            continue
+    if last["Volume"] > last["VOL20"]:
+        score += 1
 
-        row = df.iloc[i]
-
-        score = 0
-
-        if row["Close"] > row["SMA20"]:
-            score += 1
-
-        if row["SMA20"] > row["SMA60"]:
-            score += 1
-
-        if row["RSI"] > 50:
-            score += 1
-
-        if row["MACD"] > row["MACDs"]:
-            score += 1
-
-        if row["Volume"] > row["VOL20"]:
-            score += 1
-
-        # 進場條件
-        signal.append(1 if score >= 4 else 0)
-
-    df["signal"] = signal
-    return df
+    return score
 
 
 # =========================
-# 回測
+# 風險判斷（超簡化）
 # =========================
-def backtest(df):
+def risk_level(rsi):
 
-    position = 0
-    buy_price = 0
-
-    returns = []
-    trades = 0
-    wins = 0
-
-    for i in range(len(df)):
-
-        price = df["Close"].iloc[i]
-        sig = df["signal"].iloc[i]
-
-        # 進場
-        if sig == 1 and position == 0:
-            position = 1
-            buy_price = price
-            trades += 1
-
-        # 出場
-        elif sig == 0 and position == 1:
-            ret = (price - buy_price) / buy_price
-            returns.append(ret)
-
-            if ret > 0:
-                wins += 1
-
-            position = 0
-
-    if not returns:
-        return None
-
-    total_return = np.sum(returns)
-    win_rate = wins / trades if trades > 0 else 0
-    max_dd = np.min(returns)
-
-    return {
-        "總報酬": round(total_return * 100, 2),
-        "勝率": round(win_rate * 100, 2),
-        "交易次數": trades,
-        "平均交易": round(np.mean(returns) * 100, 2),
-        "最大單筆虧損": round(max_dd * 100, 2)
-    }
+    if rsi > 75:
+        return "🔴 高風險"
+    elif rsi > 60:
+        return "🟡 中風險"
+    else:
+        return "🟢 低風險"
 
 
 # =========================
@@ -157,36 +98,63 @@ if __name__ == "__main__":
     for s in stocks:
 
         try:
-            print(f"回測 {s}")
+            df = yf.Ticker(f"{s}.TW").history(period="6mo")
 
-            df = yf.Ticker(f"{s}.TW").history(period="1y")
-
-            if df.empty or len(df) < 120:
+            if df.empty or len(df) < 60:
                 continue
 
-            df = generate_signal(df)
-            result = backtest(df)
+            # 指標
+            df["RSI"] = ta.rsi(df["Close"], 14)
 
-            if not result:
+            macd = ta.macd(df["Close"])
+            df["MACD"] = macd["MACD_12_26_9"]
+            df["MACDs"] = macd["MACDs_12_26_9"]
+
+            df["SMA20"] = ta.sma(df["Close"], 20)
+            df["SMA60"] = ta.sma(df["Close"], 60)
+            df["VOL20"] = ta.sma(df["Volume"], 20)
+
+            score = score_stock(df)
+
+            rsi = df["RSI"].iloc[-1]
+
+            # 過濾太弱
+            if score < 3:
                 continue
 
-            result["股票"] = s
-
-            results.append(result)
+            results.append({
+                "股票": s,
+                "分數": score,
+                "價格": round(df["Close"].iloc[-1], 2),
+                "風險": risk_level(rsi)
+            })
 
         except:
             traceback.print_exc()
 
     if not results:
-        print("無回測結果")
+        print("無資料")
         exit()
 
     df = pd.DataFrame(results)
+    df = df.sort_values("分數", ascending=False).head(10)
 
-    df = df.sort_values("總報酬", ascending=False)
+    # =========================
+    # 📱手機友善文字表格
+    # =========================
 
-    content = "🔥 台股量化3.0 回測 TOP策略\n\n"
-    content += df.to_string(index=False)
+    content = "📱 台股量化3.2（手機簡版）\n"
+    content += "================================\n\n"
+
+    content += "排名  股票   分數  價格   風險\n"
+    content += "--------------------------------\n"
+
+    for i, row in df.iterrows():
+
+        content += f"{i+1:>2}   {row['股票']}   {row['分數']:>2}   {row['價格']:>6}   {row['風險']}\n"
+
+    content += "\n================================\n"
+    content += "說明：分數越高 → 趨勢越強\n"
 
     send_email(content)
 
