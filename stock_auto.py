@@ -11,95 +11,112 @@ from email.header import Header
 
 
 # =========================
-# Yahoo Email 發送
+# Email
 # =========================
-def send_yahoo_email(content):
+def send_email(content):
 
-    email_user = os.environ.get('YAHOO_EMAIL')
-    email_password = os.environ.get('YAHOO_PASSWORD')
+    user = os.environ.get("YAHOO_EMAIL")
+    pwd = os.environ.get("YAHOO_PASSWORD")
 
-    if not email_user or not email_password:
-        print("未偵測到 Email 環境變數")
+    if not user or not pwd:
+        print("缺 Email 環境變數")
         return
 
     try:
-        msg = MIMEText(content, 'plain', 'utf-8')
-        msg['Subject'] = Header('台股 AI 自動選股報告', 'utf-8')
-        msg['From'] = email_user
-        msg['To'] = email_user
+        msg = MIMEText(content, "plain", "utf-8")
+        msg["Subject"] = Header("台股量化2.0選股報告", "utf-8")
+        msg["From"] = user
+        msg["To"] = user
 
-        server = smtplib.SMTP('smtp.mail.yahoo.com', 587)
-        server.ehlo()
+        server = smtplib.SMTP("smtp.mail.yahoo.com", 587)
         server.starttls()
-        server.ehlo()
-        server.login(email_user, email_password)
+        server.login(user, pwd)
         server.send_message(msg)
         server.quit()
 
-        print('Email 已成功送出至 Yahoo 信箱')
+        print("Email 已寄出")
 
     except Exception as e:
-        print(f'Email 發送錯誤: {e}')
+        print(f"Email錯誤: {e}")
         traceback.print_exc()
 
 
 # =========================
-# 新聞分析
+# 股票池（熱門 + 流動性）
 # =========================
-def analyze_news(stock):
+def get_universe():
 
-    positive_keywords = ["AI", "成長", "創高", "擴產", "訂單", "買超", "利多", "調升", "NVIDIA", "CoWoS"]
-    negative_keywords = ["虧損", "衰退", "賣超", "下修", "裁員", "利空"]
+    return [
+        "2330","2317","2454","2382","2412",
+        "2303","2408","2603","2609","2615",
+        "2881","2882","2891","3711","3231",
+        "2379","2357","2353","2383","2409",
+        "2308","2301","2302","6669","6446"
+    ]
+
+
+# =========================
+# 新聞分數
+# =========================
+def news_score(stock):
+
+    pos = ["AI","成長","創高","訂單","擴產","NVIDIA"]
+    neg = ["虧損","下修","賣超","衰退","利空"]
 
     score = 0
-    news_list = []
 
     try:
         url = f"https://news.google.com/rss/search?q={stock}+台股"
         feed = feedparser.parse(url)
 
-        for entry in feed.entries[:10]:
-            title = entry.title
-            news_list.append(title)
+        for e in feed.entries[:5]:
+            t = e.title
 
-            for w in positive_keywords:
-                if w in title:
+            for w in pos:
+                if w in t:
                     score += 3
 
-            for w in negative_keywords:
-                if w in title:
+            for w in neg:
+                if w in t:
                     score -= 3
 
-    except Exception as e:
-        print(f"{stock} 新聞分析失敗: {e}")
+    except:
+        pass
 
-    return score, news_list[:3]
+    return score
 
 
 # =========================
-# 技術分析
+# 技術分數（量化核心）
 # =========================
-def technical_score(df):
+def tech_score(df):
 
     score = 0
 
     try:
-        latest = df.iloc[-1]
+        last = df.iloc[-1]
 
-        if latest["RSI"] > 50:
+        # 趨勢
+        if last["Close"] > last["SMA20"]:
             score += 15
 
-        if latest["MACD"] > latest["MACDs"]:
+        if last["SMA20"] > last["SMA60"]:
             score += 15
 
-        if latest["Close"] > latest["SMA20"]:
-            score += 15
-
-        if latest["Close"] > latest["SMA60"]:
-            score += 15
-
-        if latest["Volume"] > latest["VOL_SMA20"]:
+        # 動能
+        if last["RSI"] > 50:
             score += 10
+
+        if last["MACD"] > last["MACDs"]:
+            score += 15
+
+        # 成交量
+        if last["Volume"] > last["VOL_SMA20"]:
+            score += 10
+
+        # 避免過熱
+        if last["RSI"] > 75:
+            score -= 10
 
     except:
         pass
@@ -114,93 +131,59 @@ if __name__ == "__main__":
 
     results = []
 
-    # ===== 修正：GitHub 路徑問題 =====
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    file_path = os.path.join(BASE_DIR, "stock_list.txt")
+    stocks = get_universe()
 
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            stocks = [line.strip() for line in f.readlines() if line.strip()]
-    except Exception as e:
-        print(f"讀取 stock_list.txt 失敗: {e}")
-        exit()
-
-    # =========================
-    # 股票分析
-    # =========================
-    for stock in stocks:
+    for s in stocks:
 
         try:
-            print(f"開始分析 {stock}")
+            print(f"分析 {s}")
 
-            ticker = yf.Ticker(f"{stock}.TW")
-            df = ticker.history(period="6mo")
+            df = yf.Ticker(f"{s}.TW").history(period="6mo")
 
             if df.empty or len(df) < 60:
-                print(f"{stock} 資料不足")
                 continue
 
-            # 技術指標
-            df["RSI"] = ta.rsi(df["Close"], length=14)
+            # 指標
+            df["RSI"] = ta.rsi(df["Close"], 14)
+
             macd = ta.macd(df["Close"])
             df["MACD"] = macd["MACD_12_26_9"]
             df["MACDs"] = macd["MACDs_12_26_9"]
 
-            df["SMA20"] = ta.sma(df["Close"], length=20)
-            df["SMA60"] = ta.sma(df["Close"], length=60)
-            df["VOL_SMA20"] = ta.sma(df["Volume"], length=20)
+            df["SMA20"] = ta.sma(df["Close"], 20)
+            df["SMA60"] = ta.sma(df["Close"], 60)
+            df["VOL_SMA20"] = ta.sma(df["Volume"], 20)
 
-            latest_price = round(df["Close"].iloc[-1], 2)
+            tech = tech_score(df)
+            news = news_score(s)
 
-            day_change = round(
-                (df["Close"].iloc[-1] - df["Close"].iloc[-2])
-                / df["Close"].iloc[-2] * 100,
-                2
-            )
+            total = tech + news
 
-            if day_change > 7:
-                print(f"{stock} 漲幅過大")
+            # 過濾弱勢股
+            if total < 20:
                 continue
 
-            tech_score = technical_score(df)
-            news_score, news = analyze_news(stock)
-
-            total_score = tech_score + news_score
-
             results.append({
-                "股票": stock,
-                "收盤": latest_price,
-                "漲跌%": day_change,
-                "技術分": tech_score,
-                "新聞分": news_score,
-                "總分": total_score,
-                "新聞": " | ".join(news)
+                "股票": s,
+                "收盤": round(df["Close"].iloc[-1], 2),
+                "技術": tech,
+                "新聞": news,
+                "總分": total
             })
 
-            print(f"{stock} 完成")
-
-        except Exception:
-            print(f"{stock} 發生錯誤")
+        except:
             traceback.print_exc()
 
-    # 無資料
     if not results:
-        print("無符合條件股票")
+        print("無結果")
         exit()
 
-    # =========================
-    # 結果整理
-    # =========================
-    df_final = pd.DataFrame(results)
-    df_final = df_final.sort_values(by="總分", ascending=False).head(10)
+    df = pd.DataFrame(results)
+    df = df.sort_values("總分", ascending=False).head(10)
 
-    df_final.to_csv("stock_report.csv", index=False, encoding="utf-8-sig")
+    content = "🔥 台股量化2.0 TOP10\n\n"
+    content += df.to_string(index=False)
 
-    # =========================
-    # Email
-    # =========================
-    content = "今日 AI 台股觀察名單\n\n" + df_final.to_string(index=False)
+    send_email(content)
 
-    send_yahoo_email(content)
-
-    print(df_final)
+    print(df)
