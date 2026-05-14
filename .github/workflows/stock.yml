@@ -1,84 +1,36 @@
-name: Daily Taiwan Stock Scanner (LINE)
+name: Taiwan Stock Scanner (Stable LINE Bot)
 
 on:
-
   workflow_dispatch:
-
   schedule:
-    # 台灣時間 07:30
     - cron: '30 23 * * 0-4'
 
 jobs:
-
   run-stock:
-
     runs-on: ubuntu-latest
-
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     permissions:
       contents: write
 
     steps:
 
-      # =========================
-      # Checkout
-      # =========================
       - name: Checkout
         uses: actions/checkout@v4
 
-      # =========================
-      # Setup Python
-      # =========================
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      # =========================
-      # Install Packages
-      # =========================
       - name: Install Packages
         run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy yfinance requests feedparser pandas-ta
 
-          python -m pip install --upgrade pip setuptools wheel
-
-          pip install pandas==2.2.2 numpy yfinance twstock feedparser requests lxml
-
-          pip install --pre pandas-ta
-
-      # =========================
-      # Run Scanner (LINE VERSION)
-      # =========================
-      - name: Run Scanner
+      - name: Run Stock Scanner
         env:
           LINE_TOKEN: ${{ secrets.LINE_TOKEN }}
-
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
         run: |
-          python stock_auto.py
-
-      # =========================
-      # Upload CSV Report
-      # =========================
-      - name: Upload CSV
-        uses: actions/upload-artifact@v4
-        with:
-          name: stock-report
-          path: stock_report.csv
-
-      # =========================
-      # Commit CSV (optional)
-      # =========================
-      - name: Commit and Push Results
-        run: |
-
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-
-          git add stock_report.csv
-
-          git diff --cached --quiet && echo "No changes"
-
-          git commit -m "Auto update stock report" || exit 0
-
-          git push
+          python -u stock_auto.py
