@@ -1,11 +1,11 @@
-name: Daily Taiwan Stock Scanner
+name: Daily Taiwan Stock Scanner (LINE)
 
 on:
 
   workflow_dispatch:
 
   schedule:
-    # 台灣時間早上 07:30
+    # 台灣時間 07:30
     - cron: '30 23 * * 0-4'
 
 jobs:
@@ -22,7 +22,7 @@ jobs:
     steps:
 
       # =========================
-      # Checkout Repository
+      # Checkout
       # =========================
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,31 +43,18 @@ jobs:
 
           python -m pip install --upgrade pip setuptools wheel
 
-          # pandas 版本固定
-          pip install pandas==2.2.2
+          pip install pandas==2.2.2 numpy yfinance twstock feedparser requests lxml
 
-          # 基本套件
-          pip install \
-            numpy \
-            yfinance \
-            twstock \
-            feedparser \
-            requests \
-            lxml
-
-          # pandas-ta 預發版
           pip install --pre pandas-ta
 
       # =========================
-      # Run Python Script
+      # Run Scanner (LINE VERSION)
       # =========================
       - name: Run Scanner
         env:
-          YAHOO_EMAIL: ${{ secrets.YAHOO_EMAIL }}
-          YAHOO_PASSWORD: ${{ secrets.YAHOO_PASSWORD }}
+          LINE_TOKEN: ${{ secrets.LINE_TOKEN }}
 
         run: |
-
           python stock_auto.py
 
       # =========================
@@ -80,13 +67,12 @@ jobs:
           path: stock_report.csv
 
       # =========================
-      # Commit CSV
+      # Commit CSV (optional)
       # =========================
       - name: Commit and Push Results
         run: |
 
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
-
           git config --local user.name "github-actions[bot]"
 
           git add stock_report.csv
