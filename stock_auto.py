@@ -1,16 +1,16 @@
 import os
 import smtplib
+import traceback
 import pandas as pd
 import pandas_ta as ta
 import yfinance as yf
 import feedparser
-import traceback
 
 from email.mime.text import MIMEText
 from email.header import Header
 
 # =========================
-# Email 發送
+# 發送 Email
 # =========================
 def send_yahoo_email(content):
 
@@ -18,22 +18,32 @@ def send_yahoo_email(content):
     email_password = os.environ.get("YAHOO_PASSWORD")
 
     if not email_user or not email_password:
-        print("未設定 Yahoo 環境變數")
+        print("找不到 Yahoo Email 環境變數")
         return
 
     msg = MIMEText(content, "plain", "utf-8")
 
-    msg["Subject"] = Header("台股 AI 自動選股報告", "utf-8")
+    msg["Subject"] = Header(
+        "台股 AI 自動選股報告",
+        "utf-8"
+    )
+
     msg["From"] = email_user
     msg["To"] = email_user
 
     try:
 
-        server = smtplib.SMTP("smtp.mail.yahoo.com", 587)
+        server = smtplib.SMTP(
+            "smtp.mail.yahoo.com",
+            587
+        )
 
         server.starttls()
 
-        server.login(email_user, email_password)
+        server.login(
+            email_user,
+            email_password
+        )
 
         server.send_message(msg)
 
@@ -47,7 +57,7 @@ def send_yahoo_email(content):
 
 
 # =========================
-# 新聞情緒分析
+# 新聞分析
 # =========================
 def analyze_news(stock):
 
@@ -57,20 +67,20 @@ def analyze_news(stock):
         "創高",
         "擴產",
         "訂單",
-        "外資買超",
-        "調升",
+        "買超",
         "利多",
-        "CoWoS",
-        "NVIDIA"
+        "調升",
+        "NVIDIA",
+        "CoWoS"
     ]
 
     negative_keywords = [
-        "下修",
-        "賣超",
-        "衰退",
         "虧損",
-        "利空",
-        "裁員"
+        "衰退",
+        "賣超",
+        "下修",
+        "裁員",
+        "利空"
     ]
 
     score = 0
@@ -79,7 +89,10 @@ def analyze_news(stock):
 
     try:
 
-        url = f"https://news.google.com/rss/search?q={stock}+台股"
+        url = (
+            f"https://news.google.com/rss/"
+            f"search?q={stock}+台股"
+        )
 
         feed = feedparser.parse(url)
 
@@ -103,7 +116,7 @@ def analyze_news(stock):
 
     except Exception as e:
 
-        print(f"{stock} 新聞分析錯誤: {e}")
+        print(f"{stock} 新聞分析失敗: {e}")
 
     return score, news_list[:3]
 
@@ -127,15 +140,15 @@ def technical_score(df):
         if latest["MACD"] > latest["MACDs"]:
             score += 15
 
-        # 站上月線
+        # 月線
         if latest["Close"] > latest["SMA20"]:
             score += 15
 
-        # 站上季線
+        # 季線
         if latest["Close"] > latest["SMA60"]:
             score += 15
 
-        # 成交量放大
+        # 成交量
         if latest["Volume"] > latest["VOL_SMA20"]:
             score += 10
 
@@ -152,11 +165,15 @@ if __name__ == "__main__":
 
     results = []
 
+    # 股票清單
     try:
 
         with open("stock_list.txt", "r") as f:
 
-            stocks = [line.strip() for line in f.readlines()]
+            stocks = [
+                line.strip()
+                for line in f.readlines()
+            ]
 
     except Exception as e:
 
@@ -164,6 +181,7 @@ if __name__ == "__main__":
 
         exit()
 
+    # 分析股票
     for stock in stocks:
 
         try:
@@ -179,15 +197,25 @@ if __name__ == "__main__":
 
             # 防呆
             if df.empty:
+
                 print(f"{stock} 無資料")
+
                 continue
 
             if len(df) < 60:
+
                 print(f"{stock} 資料不足")
+
                 continue
 
+            # =========================
             # 技術指標
-            df["RSI"] = ta.rsi(df["Close"], length=14)
+            # =========================
+
+            df["RSI"] = ta.rsi(
+                df["Close"],
+                length=14
+            )
 
             macd = ta.macd(df["Close"])
 
@@ -195,16 +223,34 @@ if __name__ == "__main__":
 
             df["MACDs"] = macd["MACDs_12_26_9"]
 
-            df["SMA20"] = ta.sma(df["Close"], length=20)
+            df["SMA20"] = ta.sma(
+                df["Close"],
+                length=20
+            )
 
-            df["SMA60"] = ta.sma(df["Close"], length=60)
+            df["SMA60"] = ta.sma(
+                df["Close"],
+                length=60
+            )
 
-            df["VOL_SMA20"] = ta.sma(df["Volume"], length=20)
+            df["VOL_SMA20"] = ta.sma(
+                df["Volume"],
+                length=20
+            )
 
+            # =========================
             # 昨日收盤
-            latest_price = round(df["Close"].iloc[-1], 2)
+            # =========================
 
-            # 昨日漲跌幅
+            latest_price = round(
+                df["Close"].iloc[-1],
+                2
+            )
+
+            # =========================
+            # 漲跌幅
+            # =========================
+
             day_change = round(
                 (
                     (
@@ -218,17 +264,27 @@ if __name__ == "__main__":
 
             # 過熱排除
             if day_change > 7:
-                print(f"{stock} 漲太多，跳過")
+
+                print(f"{stock} 漲幅過大")
+
                 continue
 
-            # 技術分
+            # =========================
+            # 分數
+            # =========================
+
             tech_score = technical_score(df)
 
-            # 新聞分
             news_score, news = analyze_news(stock)
 
-            # 總分
-            total_score = tech_score + news_score
+            total_score = (
+                tech_score
+                + news_score
+            )
+
+            # =========================
+            # 結果
+            # =========================
 
             results.append({
 
@@ -244,20 +300,23 @@ if __name__ == "__main__":
 
             print(f"{stock} 完成")
 
-        except Exception as e:
+        except Exception:
 
             print(f"{stock} 發生錯誤")
 
             traceback.print_exc()
 
-    # 沒資料
+    # 無結果
     if len(results) == 0:
 
-        print("今日無符合條件股票")
+        print("無符合條件股票")
 
         exit()
 
+    # =========================
     # DataFrame
+    # =========================
+
     df_final = pd.DataFrame(results)
 
     # 排序
@@ -266,19 +325,28 @@ if __name__ == "__main__":
         ascending=False
     ).head(10)
 
+    # =========================
     # 儲存 CSV
+    # =========================
+
     df_final.to_csv(
         "stock_report.csv",
         index=False,
         encoding="utf-8-sig"
     )
 
-    # Email內容
+    # =========================
+    # Email 內容
+    # =========================
+
     content = "今日 AI 台股觀察名單\n\n"
 
     content += df_final.to_string(index=False)
 
-    # 寄送
+    # =========================
+    # 寄送 Email
+    # =========================
+
     send_yahoo_email(content)
 
     print(df_final)
