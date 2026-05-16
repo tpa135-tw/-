@@ -1,4 +1,4 @@
-name: Taiwan Stock Scanner (Stable LINE Bot)
+name: 台灣股票分析師
 
 on:
   workflow_dispatch:
